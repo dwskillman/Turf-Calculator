@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rectangle Calculator</title>
+    <style>
+
+        label {
+            display: block;
+            margin-bottom: 16px;
+            font-weight: bold;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        #output1, #output2 {
+            background-color: #fff;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .output-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .output-item:last-child {
+            border-bottom: none;
+        }
+
+        .output-label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .output-value {
+            color: #000;
+        }
+
+        canvas {
+            display: block;
+            margin: 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+
+        }
+
+        a {
+            color: #1a73e8;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .row {
+          display: flex;
+          flex-direction: row;
+        }
+        .col {
+          display: flex;
+          flex-direction: column;
+        }
+        .w60 {
+          width:60%;
+        }
+        .w50 {
+          width:50%;
+        }
+        .w40 {
+          width:40%;
+        }
+        .mr3 {
+          margin-right: 3em;
+        }
+        .p20 {
+          padding: 20px;
+        }
+
+        .mobileMarginTop {
+          margin-top: 0px;
+        }
+
+        @media (max-width: 800px) {
+          .row {
+            flex-direction: column;
+            width:100%;
+          }
+          .col {
+            width: 100%;
+          }
+          .mr3 {
+            margin-right: 0px;
+          }
+          .mobileMarginTop {
+            margin-top: 20px;
+          }
+        }
+    </style>
+</head>
+<body>
+  <div class="row">
+    <div class="col w40 mr3 p20" style="background: white;border-radius:15px;">
+      <label for="width">Width (ft):</label>
+      <input type="number" id="width" step="1" onchange="changeHandler(this)">
+      <label for="length">Length (ft):</label>
+      <input type="number" id="length" step="1" onchange="changeHandler(this)">
+      <label id="optionOne" for="output1">Option 1:</label>
+      <div id="output1"></div>
+      <label id="optionTwo" for="output2" style="margin-top:20px;">Option 2:</label>
+      <div id="output2"></div>
+    </div>
+    <div class="col w60 mobileMarginTop">
+      <label id="cOptionOne" for="canvas">Option 1</label>
+      <canvas id="canvasVert"></canvas>
+      <label id="cOptionTwo" for="canvas" style="margin-top:16px;">Option 2</label>
+      <canvas id="canvasHorz"></canvas>
+    </div>
+  </div>
+  <script>
+      const widthInput = document.getElementById('width');
+      const lengthInput = document.getElementById('length');
+      const output1 = document.getElementById('output1');
+      const output2 = document.getElementById('output2');
+      const canvasVert = document.getElementById('canvasVert');
+      const canvasHorz = document.getElementById('canvasHorz');
+      const ctxVert = canvasVert.getContext('2d');
+      const ctxHorz = canvasHorz.getContext('2d');
+
+      function detectMob() {
+          return ((window.innerWidth <= 500) && (window.innerHeight <= 600));
+      }
+
+      function setCanvasResolution(canvas) {
+          const style = getComputedStyle(canvas);
+          const width = parseInt(style.width);
+          const height = parseInt(style.height);
+          canvas.width = width;
+          canvas.height = height;
+      }
+
+      function drawInitialText(ctx, canvas) {
+          setCanvasResolution(canvas);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.font = '1em Arial';
+          ctx.fillStyle = 'white';
+          ctx.textAlign = 'center';
+          ctx.fillText('Enter dimensions to calculate turf', canvas.width / 2, canvas.height / 2);
+      }
+
+      function formatNumber(num) {
+          return num.toFixed(1).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      }
+
+      function changeHandler(val) {
+          if (Number(val.value) > 100) {
+              val.value = 100;
+          }
+      }
+
+      function getInfill(base, sqft) {
+        let bags = 50;
+        let lbs = sqft * base;
+        return Math.ceil(lbs / bags);
+      }
+
+      function updateOutput(el, totalSquareFeet, sections, length, totalWidthInRolls, sqFtPurchaseAmount, excessTurf, width, horizontal) {
+
+          // Infill Requirements in lbs
+          const infill70 = 1.3;
+          const infill80 = 1.65;
+          const infillPG = 2;
+
+          if (horizontal) {
+            el.innerHTML = `
+                <div class="output-item">
+                    <span class="output-label">Total Sq Ft:</span>
+                    <span class="output-value">${formatNumber(totalSquareFeet)}</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label">Total number of rolls:</span>
+                    <span class="output-value">${sections.length} rolls (15ft x ${width > 0 ? width : 0}ft each)</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label">Total width in 15' Rolls:</span>
+                    <span class="output-value">${formatNumber(totalWidthInRolls)}</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label">Sq Ft Purchase Amount:</span>
+                    <span class="output-value">${formatNumber(sqFtPurchaseAmount)}</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label">Excess Turf:</span>
+                    <span class="output-value">${formatNumber(excessTurf)} sq ft. <a href="https://theturfyard.com" target="_blank">Get Ideas</a></span>
+                </div>
+                <div class="output-item" style="background:#eee;">
+                    <span class="output-label" style="margin-left:10px;">Infill Recommendations:</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label" style="margin-left:10px;"><a href="https://theturfyard.com/turf-infill/">LUSH70:</a></span>
+                    <span class="output-value">${getInfill(infill70, totalSquareFeet)} (50lb) bags</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label" style="margin-left:10px;"><a href="https://theturfyard.com/turf-infill/">LUSH80:</a></span>
+                    <span class="output-value">${getInfill(infill80, totalSquareFeet)} (50lb) bags</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label" style="margin-left:10px;"><a href="https://theturfyard.com/turf-infill/">Putting Greens:</a></span>
+                    <span class="output-value">${getInfill(infillPG, totalSquareFeet)} (50lb) bags</span>
+                </div>
+            `;
+          }else{
+            el.innerHTML = `
+                <div class="output-item">
+                    <span class="output-label">Total Sq Ft:</span>
+                    <span class="output-value">${formatNumber(totalSquareFeet)}</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label">Total number of rolls:</span>
+                    <span class="output-value">${sections.length} rolls (15ft x ${length > 0 ? length : 0}ft each)</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label">Total width in 15' Rolls:</span>
+                    <span class="output-value">${formatNumber(totalWidthInRolls)}</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label">Sq Ft Purchase Amount:</span>
+                    <span class="output-value">${formatNumber(sqFtPurchaseAmount)}</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label">Excess Turf:</span>
+                    <span class="output-value">${formatNumber(excessTurf)} sq ft. <a href="https://theturfyard.com" target="_blank">Get Ideas</a></span>
+                </div>
+                <div class="output-item" style="background:#eee;">
+                    <span class="output-label" style="margin-left:10px;">Infill Recommendations:</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label" style="margin-left:10px;"><a href="https://theturfyard.com/turf-infill/">LUSH70:</a></span>
+                    <span class="output-value">${getInfill(infill70, totalSquareFeet)} (50lb) bags</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label" style="margin-left:10px;"><a href="https://theturfyard.com/turf-infill/">LUSH80:</a></span>
+                    <span class="output-value">${getInfill(infill80, totalSquareFeet)} (50lb) bags</span>
+                </div>
+                <div class="output-item">
+                    <span class="output-label" style="margin-left:10px;"><a href="https://theturfyard.com/turf-infill/">Putting Greens:</a></span>
+                    <span class="output-value">${getInfill(infillPG, totalSquareFeet)} (50lb) bags</span>
+                </div>
+            `;
+          }
+      }
+
+      function drawDoubleEndedArrow(ctx, startX, startY, endX, endY, arrowSize) {
+          // Draw the line
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+
+          // Calculate the angle of the line
+          const angle = Math.atan2(endY - startY, endX - startX);
+
+          // Draw the arrow heads
+          ctx.beginPath();
+          ctx.moveTo(endX, endY);
+          ctx.lineTo(endX - arrowSize * Math.cos(angle - Math.PI / 6), endY - arrowSize * Math.sin(angle - Math.PI / 6));
+          ctx.lineTo(endX - arrowSize * Math.cos(angle + Math.PI / 6), endY - arrowSize * Math.sin(angle + Math.PI / 6));
+          ctx.lineTo(endX, endY);
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(startX + arrowSize * Math.cos(angle - Math.PI / 6), startY + arrowSize * Math.sin(angle - Math.PI / 6));
+          ctx.lineTo(startX + arrowSize * Math.cos(angle + Math.PI / 6), startY + arrowSize * Math.sin(angle + Math.PI / 6));
+          ctx.lineTo(startX, startY);
+          ctx.fill();
+      }
+
+      function drawLabel(ctx, canvasWidth, startY, arrowSize) {
+          const label = "Grain Direction";
+          ctx.font = '.75em Arial';
+          ctx.fillStyle = 'white';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(label, canvasWidth / 2, startY - arrowSize / 2);
+      }
+
+      function drawVerticalDoubleEndedArrow(ctx, startX, startY, endX, endY, arrowSize) {
+          // Draw the vertical line
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+
+          // Calculate the angle of the line
+          const angle = Math.atan2(endY - startY, endX - startX);
+
+          // Draw the arrow heads
+          const arrowLength = arrowSize;
+          const arrowWidth = arrowSize / 2;
+
+          // Draw the bottom arrow head
+          ctx.beginPath();
+          ctx.moveTo(endX, endY);
+          ctx.lineTo(endX - arrowWidth * Math.cos(angle - Math.PI / 6), endY - arrowWidth * Math.sin(angle - Math.PI / 6));
+          ctx.lineTo(endX - arrowWidth * Math.cos(angle + Math.PI / 6), endY - arrowWidth * Math.sin(angle + Math.PI / 6));
+          ctx.lineTo(endX, endY);
+          ctx.fill();
+
+          // Draw the top arrow head
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(startX + arrowWidth * Math.cos(angle - Math.PI / 6), startY + arrowWidth * Math.sin(angle - Math.PI / 6));
+          ctx.lineTo(startX + arrowWidth * Math.cos(angle + Math.PI / 6), startY + arrowWidth * Math.sin(angle + Math.PI / 6));
+          ctx.lineTo(startX, startY);
+          ctx.fill();
+      }
+
+      function drawRotatedLabel(ctx, positionX, positionY, text, angle) {
+          ctx.save();
+          ctx.translate(positionX, positionY); // Move to the position
+          ctx.rotate(angle); // Rotate
+          ctx.font = '.75em Arial';
+          ctx.fillStyle = 'white';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(text, 0, 0); // Draw text at center
+          ctx.restore();
+      }
+
+      function updateHorzCanvas() {
+          const width = parseFloat(widthInput.value) || 0;
+          const length = parseFloat(lengthInput.value) || 0;
+
+          const totalSquareFeet = width * length;
+          const rollWidth = 15; // Roll width in feet
+
+          let fullSections, remainder, canvasWidth, canvasHeight;
+
+          fullSections = Math.floor(length / rollWidth);
+          remainder = length % rollWidth;
+          canvasWidth = width * 15; // Increase canvas width by 1.5
+          canvasHeight = (fullSections * rollWidth + (remainder > 0 ? rollWidth : 0)) * 15; // Increase canvas height by 1.5
+
+          // Get the container width
+          const containerWidth = canvasHorz.parentElement.clientWidth;
+
+          // Calculate the scaling factor to constrain the canvas width
+          const scalingFactor = canvasWidth > containerWidth ? containerWidth / canvasWidth : 1;
+
+          // Apply the scaling factor to the canvas dimensions
+          canvasWidth *= scalingFactor;
+          canvasHeight *= scalingFactor;
+
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          canvasHorz.width = canvasWidth * devicePixelRatio;
+          canvasHorz.height = canvasHeight * devicePixelRatio;
+          canvasHorz.style.width = canvasWidth + 'px';
+          canvasHorz.style.height = canvasHeight + 'px';
+          const ctx = canvasHorz.getContext('2d');
+          ctx.scale(devicePixelRatio, devicePixelRatio);
+
+          ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+          const bg = new Image();
+          bg.src = 'https://theturfyard.com/wp-content/uploads/2024/07/grass-bg.jpg';
+
+          bg.onload = function() {
+              const imageWidth = bg.width;
+              const imageHeight = bg.height;
+
+              const scale = Math.max(canvasWidth / imageWidth, canvasHeight / imageHeight);
+              const scaledWidth = imageWidth * scale;
+              const scaledHeight = imageHeight * scale;
+              const x = (canvasWidth - scaledWidth) / 2;
+              const y = (canvasHeight - scaledHeight) / 2;
+
+              ctx.drawImage(bg, x, y, scaledWidth, scaledHeight);
+
+              const img = new Image();
+              img.src = 'https://theturfyard.com/wp-content/uploads/2024/07/turfyard.jpg';
+
+              img.onload = function() {
+                  const imageWidth = img.width;
+                  const imageHeight = img.height;
+
+                  const scale = Math.min(canvasWidth / (1.5 * imageWidth), canvasHeight / (1.5 * imageHeight));
+                  const scaledWidth = imageWidth * scale;
+                  const scaledHeight = imageHeight * scale;
+                  const x = (canvasWidth - scaledWidth) / 2;
+                  const y = (canvasHeight - scaledHeight) / 2;
+
+                  ctx.globalAlpha = 0.35;
+                  ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
+                  ctx.globalAlpha = 1.0;
+
+                  ctx.strokeStyle = 'white';
+                  ctx.lineWidth = 3;
+
+                  let sections = [];
+                  for (let i = 0; i < fullSections; i++) {
+                      sections.push(rollWidth);
+                  }
+                  if (remainder > 0) {
+                      sections.push(remainder);
+                  }
+
+                  let currentY = 0;
+                  for (let i = 0; i < sections.length; i++) {
+                      const sectionHeight = sections[i] * 15 * scalingFactor; // Adjust the section height scaling
+                      ctx.beginPath();
+                      ctx.moveTo(0, currentY);
+                      ctx.lineTo(canvasWidth, currentY);
+                      ctx.stroke();
+
+                      const sectionCenterX = canvasWidth / 2;
+                      const sectionCenterY = currentY + (sectionHeight / 2);
+                      ctx.font = '1em Arial';
+                      ctx.fillStyle = 'white';
+                      ctx.textAlign = 'center';
+                      ctx.textBaseline = 'middle';
+                      ctx.fillText(`${sections[i]} ft x ${width} ft`, sectionCenterX, sectionCenterY);
+
+                      const arrowY = currentY - 20; // Adjust the arrow position as needed
+                      // Draw the double-ended arrow just above the seam
+                      drawDoubleEndedArrow(ctx, 20, currentY - 20, canvasWidth - 20, currentY - 20, 10);
+
+                      // Draw the label centered and just above the arrow
+                      drawLabel(ctx, canvasWidth, arrowY, 10);
+
+                      currentY += sectionHeight;
+                  }
+
+                  if (remainder > 0 && fullSections > 0) {
+                      const wasteHeight = rollWidth - remainder;
+                      const wasteY = currentY;
+                      ctx.fillStyle = 'red';
+                      ctx.fillRect(0, wasteY, canvasWidth, wasteHeight * 15 * scalingFactor); // Adjust the waste height scaling
+
+                      const wasteSqft = wasteHeight * width;
+                      length < 25 ? ctx.font = '.75em Arial' : ctx.font = '1em Arial';
+                      ctx.fillStyle = 'white';
+                      ctx.textAlign = 'center';
+                      ctx.textBaseline = 'middle';
+                      ctx.fillText(`Waste: ${wasteSqft} sqft (${wasteHeight} ft x ${width} ft)`, canvasWidth / 2, wasteY + (wasteHeight * 15 * scalingFactor / 2));
+                  }
+
+                  const totalWidthInRolls = (fullSections + (remainder > 0 ? 1 : 0)) * rollWidth;
+                  console.log(totalWidthInRolls);
+                  const sqFtPurchaseAmount = totalWidthInRolls * width;
+                  const excessTurf = Math.max(0, sqFtPurchaseAmount - totalSquareFeet); // Ensure excessTurf is not negative
+
+                  updateOutput(output2, totalSquareFeet, sections, length, totalWidthInRolls, sqFtPurchaseAmount, excessTurf, width, true);
+              }
+          }
+      }
+
+
+
+      function updateVertCanvas() {
+          const width = parseFloat(widthInput.value) || 0;
+          const length = parseFloat(lengthInput.value) || 0;
+
+          const totalSquareFeet = width * length;
+          const rollWidth = 15; // Roll width in feet
+
+          let fullSections, remainder, canvasWidth, canvasHeight;
+          fullSections = Math.floor(width / rollWidth);
+          remainder = width % rollWidth;
+          canvasWidth = (fullSections * rollWidth + (remainder > 0 ? rollWidth : 0)) * 15; // Increase canvas width by 1.5
+          canvasHeight = length * 15; // Increase canvas height by 1.5
+
+          // Get the container width
+          const containerWidth = canvasVert.parentElement.clientWidth;
+
+          // Calculate the scaling factor to constrain the canvas width
+          const scalingFactor = canvasWidth > containerWidth ? containerWidth / canvasWidth : 1;
+
+          // Apply the scaling factor to the canvas dimensions
+          canvasWidth *= scalingFactor;
+          canvasHeight *= scalingFactor;
+
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          canvasVert.width = canvasWidth * devicePixelRatio;
+          canvasVert.height = canvasHeight * devicePixelRatio;
+          canvasVert.style.width = canvasWidth + 'px';
+          canvasVert.style.height = canvasHeight + 'px';
+          const ctx = canvasVert.getContext('2d');
+          ctx.scale(devicePixelRatio, devicePixelRatio);
+
+          ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+          const bg = new Image();
+          bg.src = 'https://theturfyard.com/wp-content/uploads/2024/07/grass-bg.jpg';
+
+          bg.onload = function() {
+              const imageWidth = bg.width;
+              const imageHeight = bg.height;
+
+              const scale = Math.max(canvasWidth / imageWidth, canvasHeight / imageHeight);
+              const scaledWidth = imageWidth * scale;
+              const scaledHeight = imageHeight * scale;
+              const x = (canvasWidth - scaledWidth) / 2;
+              const y = (canvasHeight - scaledHeight) / 2;
+
+              ctx.drawImage(bg, x, y, scaledWidth, scaledHeight);
+
+              const img = new Image();
+              img.src = 'https://theturfyard.com/wp-content/uploads/2024/07/turfyard.jpg';
+
+              img.onload = function() {
+                  const imageWidth = img.width;
+                  const imageHeight = img.height;
+
+                  const scale = Math.min(canvasWidth / (1.5 * imageWidth), canvasHeight / (1.5 * imageHeight));
+                  const scaledWidth = imageWidth * scale;
+                  const scaledHeight = imageHeight * scale;
+                  const x = (canvasWidth - scaledWidth) / 2;
+                  const y = (canvasHeight - scaledHeight) / 2;
+
+                  ctx.globalAlpha = 0.35;
+                  ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
+                  ctx.globalAlpha = 1.0;
+
+                  ctx.strokeStyle = 'white';
+                  ctx.lineWidth = 3;
+
+                  let sections = [];
+                  for (let i = 0; i < fullSections; i++) {
+                      sections.push(rollWidth);
+                  }
+                  if (remainder > 0) {
+                      sections.push(remainder);
+                  }
+
+                  let currentX = 0;
+                  for (let i = 0; i < sections.length; i++) {
+                      const sectionWidth = sections[i] * 15 * scalingFactor; // Adjust the section width scaling
+                      ctx.beginPath();
+                      ctx.moveTo(currentX, 0);
+                      ctx.lineTo(currentX, canvasHeight);
+                      ctx.stroke();
+
+                      const sectionCenterX = currentX + (sectionWidth / 2);
+                      const sectionCenterY = canvasHeight / 2;
+                      ctx.font = '1em Arial';
+                      ctx.fillStyle = 'white';
+                      ctx.textAlign = 'center';
+                      ctx.textBaseline = 'middle';
+
+                      if (sections[i] < 15) {
+                          // Save the current context state
+                          ctx.save();
+
+                          // Translate to the center of the text
+                          ctx.translate(sectionCenterX, sectionCenterY);
+
+                          // Rotate by -90 degrees (in radians)
+                          ctx.rotate(-Math.PI / 2);
+
+                          // Draw the text, adjusting the position for rotation
+                          ctx.fillText(`${sections[i]} ft x ${length} ft`, 0, 0);
+
+                          // Restore the context to its original state
+                          ctx.restore();
+                      } else {
+                          // Draw the text normally
+                          ctx.fillText(`${sections[i]} ft x ${length} ft`, sectionCenterX, sectionCenterY);
+                      }
+
+
+                      // Draw the double-ended arrow vertically, offset to the left by 20px
+                      const arrowOffsetX = -20; // Offset for the arrow
+                      const arrowX = currentX + arrowOffsetX;
+                      drawVerticalDoubleEndedArrow(ctx, arrowX, 10, arrowX, canvasHeight - 10, 20);
+
+                      // Draw the vertically centered label to the left of the arrow
+                      const labelX = arrowX - 20; // Adjust as needed
+                      const labelY = canvasHeight / 2; // Center vertically relative to the arrow
+                      drawRotatedLabel(ctx, labelX, labelY, 'Grain Direction', -Math.PI / 2);
+
+                      currentX += sectionWidth;
+                  }
+
+                  if (remainder > 0 && fullSections > 0) {
+                      const wasteWidth = rollWidth - remainder;
+                      const wasteX = currentX;
+                      ctx.fillStyle = 'red';
+                      ctx.fillRect(wasteX, 0, wasteWidth * 15 * scalingFactor, canvasHeight); // Adjust the waste width scaling
+
+                      ctx.save();
+                      ctx.translate(wasteX + (wasteWidth * 15 * scalingFactor / 2), canvasHeight / 2);
+                      ctx.rotate(-Math.PI / 2);
+
+                      const wasteSqft = wasteWidth * length;
+                      length < 25 ? ctx.font = '.75em Arial' : ctx.font = '1em Arial';
+                      ctx.fillStyle = 'white';
+                      ctx.textAlign = 'center';
+                      ctx.textBaseline = 'middle';
+                      ctx.fillText(`Waste: ${wasteSqft} sqft (${wasteWidth} ft x ${length} ft)`, 0, 0);
+                      ctx.restore();
+                  }
+
+                  const totalWidthInRolls = (fullSections + (remainder > 0 ? 1 : 0)) * rollWidth;
+                  const sqFtPurchaseAmount = totalWidthInRolls * length;
+                  const excessTurf = Math.max(0, sqFtPurchaseAmount - totalSquareFeet); // Ensure excessTurf is not negative
+
+                  updateOutput(output1, totalSquareFeet, sections, length, totalWidthInRolls, sqFtPurchaseAmount, excessTurf, width);
+              }
+          }
+      }
+
+
+      setCanvasResolution(canvasHorz);
+      setCanvasResolution(canvasVert);
+      drawInitialText(ctxHorz, canvasHorz);
+      drawInitialText(ctxVert, canvasVert);
+      updateOutput(output1,0, [], 0, 0, 0, 0);
+      updateOutput(output2,0, [], 0, 0, 0, 0);
+
+      widthInput.addEventListener('input', updateHorzCanvas);
+      lengthInput.addEventListener('input', updateHorzCanvas);
+      widthInput.addEventListener('input', updateVertCanvas);
+      lengthInput.addEventListener('input', updateVertCanvas);
+  </script>
+
+</body>
+</html>
